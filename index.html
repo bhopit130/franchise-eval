@@ -11,7 +11,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-      signOut, onAuthStateChanged, updateProfile
+      signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
       getFirestore, doc, setDoc, getDoc,
@@ -31,7 +31,7 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    window._fb = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, deleteDoc };
+    window._fb = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, deleteDoc };
   </script>
 
   <style>
@@ -664,6 +664,7 @@
       <div class="auth-field"><label>อีเมล</label><input class="m-input" id="login-email" type="email" placeholder="example@email.com" /></div>
       <div class="auth-field"><label>รหัสผ่าน</label><input class="m-input" id="login-pass" type="password" placeholder="••••••••" /></div>
       <button class="auth-btn" id="btn-login">เข้าสู่ระบบ</button>
+      <p class="auth-switch" style="margin-top:10px"><a href="#" id="btn-forgot-pass" class="auth-link" style="font-size:13px">ลืมรหัสผ่าน?</a></p>
       <p class="auth-switch">ยังไม่มีบัญชี? <a href="#" id="to-register" class="auth-link">ลงทะเบียน</a></p>
     </div>
 
@@ -844,9 +845,8 @@
       </div>
       <div class="settings-grid">
         <button class="settings-pill" onclick="goDetail('detail-menu-count')"><span class="sp-icon">🍹</span><span>จำนวนรายการสินค้า</span><span class="sp-arrow">›</span></button>
-        <button class="settings-pill" onclick="goDetail('detail-price-per-cup')"><span class="sp-icon">💵</span><span>ราคาต่อแก้ว (ทุกเมนู)</span><span class="sp-arrow">›</span></button>
+        <button class="settings-pill" onclick="goDetail('detail-price-per-cup')"><span class="sp-icon">💵</span><span>จัดการเมนูสินค้า</span><span class="sp-arrow">›</span></button>
         <button class="settings-pill" onclick="goDetail('detail-fixed-cost')"><span class="sp-icon">🏢</span><span>ต้นทุนคงที่</span><span class="sp-arrow">›</span></button>
-        <button class="settings-pill" onclick="goDetail('detail-vc-per-cup')"><span class="sp-icon">🔧</span><span>ต้นทุนต่อแก้ว</span><span class="sp-arrow">›</span></button>
         <button class="settings-pill" onclick="goDetail('detail-daily-target')"><span class="sp-icon">📅</span><span>แก้วที่ต้องการขาย/วัน (ฐาน)</span><span class="sp-arrow">›</span></button>
         <button class="settings-pill" onclick="goDetail('detail-production')"><span class="sp-icon">⚙️</span><span>กำลังผลิตสูงสุด</span><span class="sp-arrow">›</span></button>
         <button class="settings-pill" onclick="goDetail('detail-market-price')"><span class="sp-icon">🏷️</span><span>ราคาต่ำสุดในตลาด</span><span class="sp-arrow">›</span></button>
@@ -903,7 +903,7 @@
         <button class="back-btn" onclick="goView('view-settings')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
         </button>
-        <div class="detail-title">ราคาต่อแก้ว (ทุกเมนู)</div>
+        <div class="detail-title">จัดการเมนูสินค้า</div>
       </div>
       <div id="price-per-cup-list"></div>
       <div class="bottom-bar"><button class="done-btn" onclick="savePriceCupAndGo()">เสร็จสิ้น</button></div>
@@ -937,21 +937,6 @@
         </table>
       </div>
       <div class="bottom-bar"><button class="done-btn" onclick="saveFixedCostAndGo()">เสร็จสิ้น</button></div>
-    </div>
-
-    <!-- ════════════ DETAIL: ต้นทุนต่อแก้ว ════════════ -->
-    <div class="view" id="detail-vc-per-cup">
-      <div class="detail-header">
-        <button class="back-btn" onclick="goView('view-settings')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <div class="detail-title">ต้นทุนต่อแก้ว (VC)</div>
-      </div>
-      <div class="m-card">
-        <label class="m-label">ต้นทุนผันแปร / แก้ว (บาท)</label>
-        <input class="m-input" id="inp-vc" type="number" min="0" placeholder="เช่น 18" />
-      </div>
-      <div class="bottom-bar"><button class="done-btn" onclick="saveAndCompute('view-settings')">เสร็จสิ้น</button></div>
     </div>
 
     <!-- ════════════ DETAIL: แก้วที่ต้องการขาย/วัน ════════════ -->
@@ -1008,11 +993,11 @@
         <div class="detail-title">ต้นทุนต่อแก้ว (%)</div>
       </div>
       <div class="m-card">
-        <label class="m-label">% ต้นทุนผันแปรต่อราคาขาย (คำนวณอัตโนมัติ)</label>
-        <input class="m-input" id="inp-vc-pct" type="number" placeholder="–" readonly style="background:rgba(30,70,180,0.3);cursor:default" />
+        <label class="m-label">% ต้นทุนผันแปรต่อราคาขาย</label>
+        <input class="m-input" id="inp-vc-pct" type="number" min="0" max="100" placeholder="เช่น 35" />
       </div>
-      <div class="note-text">* คำนวณจาก (ต้นทุน/แก้ว ÷ ราคาขาย) × 100</div>
-      <div class="bottom-bar"><button class="done-btn" onclick="goView('view-settings')">เสร็จสิ้น</button></div>
+      <div class="note-text">* กรอกเปอร์เซ็นต์ต้นทุนผันแปรต่อแก้วเทียบกับราคาขายด้วยตนเอง (ต้นทุน/แก้ว = ราคาขายเฉลี่ย × % ÷ 100)</div>
+      <div class="bottom-bar"><button class="done-btn" onclick="saveAndCompute('view-settings')">เสร็จสิ้น</button></div>
     </div>
 
     <!-- ════════════ DETAIL: Demand Data ════════════ -->
@@ -1082,9 +1067,8 @@ const VIEW_TITLES = {
   'view-settings':    '⚙️ ตั้งค่าข้อมูล',
   'view-add-monthly': '📋 บันทึกรายเดือน',
   'detail-menu-count':    '🍹 จำนวนรายการสินค้า',
-  'detail-price-per-cup': '💵 ราคาต่อแก้ว',
+  'detail-price-per-cup': '💵 จัดการเมนูสินค้า',
   'detail-fixed-cost':    '🏢 ต้นทุนคงที่',
-  'detail-vc-per-cup':    '🔧 ต้นทุนต่อแก้ว',
   'detail-daily-target':  '📅 แก้วที่ต้องการขาย/วัน',
   'detail-production':    '⚙️ กำลังผลิต',
   'detail-market-price':  '🏷️ ราคาต่ำสุดในตลาด',
@@ -1132,7 +1116,6 @@ function goView(id) {
   if (id === 'detail-demand')       renderDemandRowsScreen();
   if (id === 'detail-price-per-cup') renderPricePerCupRows();
   if (id === 'detail-fixed-cost')   prefillFixedCosts();
-  if (id === 'detail-vc-pct')       refreshVcPct();
   if (id === 'view-analytics') {
     setTimeout(() => { renderMonthlyChart(); renderAccordion(); }, 50);
   }
@@ -1156,7 +1139,7 @@ function waitForFirebase(cb) {
 
 waitForFirebase(fb => {
   const { auth, db, onAuthStateChanged, signOut,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendPasswordResetEmail,
     doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy } = fb;
 
   onAuthStateChanged(auth, async user => {
@@ -1197,6 +1180,20 @@ waitForFirebase(fb => {
     setLoading('btn-register', false);
   });
 
+  /* Forgot password */
+  document.getElementById('btn-forgot-pass').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const prefill = v('login-email');
+    const email = prompt('กรุณากรอกอีเมลที่ใช้สมัครสมาชิก เพื่อรับลิงก์รีเซ็ตรหัสผ่าน', prefill);
+    if (!email) return;
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      toast('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลแล้ว', 'success');
+    } catch (e2) {
+      toast('ส่งลิงก์รีเซ็ตรหัสผ่านไม่สำเร็จ: ' + friendlyError(e2.code), 'error');
+    }
+  });
+
   /* Logout */
   ['btn-logout-sidebar','btn-logout-mobile'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', async () => {
@@ -1214,7 +1211,7 @@ waitForFirebase(fb => {
         state.demandData = d.demandData || [];
         state.menuPrices = d.menuPrices || [];
         state.menuCount  = d.menu || 1;
-        const fields = ['menu','vc','daily','cap','mktprice'];
+        const fields = ['menu','daily','cap','mktprice','vc-pct'];
         fields.forEach(f => {
           const el = document.getElementById('inp-' + f);
           if (el && d[f] !== undefined) el.value = d[f];
@@ -1234,7 +1231,7 @@ waitForFirebase(fb => {
   window.saveAndCompute = async function(goTo) {
     computeAll();
     const payload = {
-      menu: numId('inp-menu'), vc: numId('inp-vc'), daily: numId('inp-daily'),
+      menu: numId('inp-menu'), vc: getWeightedVc(), 'vc-pct': numId('inp-vc-pct'), daily: numId('inp-daily'),
       cap: numId('inp-cap'), mktprice: numId('inp-mktprice'),
       fixedCosts: state.fixedCosts, demandData: state.demandData,
       menuPrices: state.menuPrices, updatedAt: new Date().toISOString()
@@ -1307,7 +1304,7 @@ window.saveFixedCostAndGo = async function() {
 ════════════════════════════════ */
 function renderPricePerCupRows() {
   const menuCount = parseInt(document.getElementById('inp-menu')?.value) || state.menuCount || 1;
-  while (state.menuPrices.length < menuCount) state.menuPrices.push({ price:'', qty:'' });
+  while (state.menuPrices.length < menuCount) state.menuPrices.push({ name:'', price:'', qty:'' });
   state.menuPrices = state.menuPrices.slice(0, menuCount);
   const container = document.getElementById('price-per-cup-list');
   container.innerHTML = '';
@@ -1316,16 +1313,20 @@ function renderPricePerCupRows() {
     div.className = 'm-card';
     div.innerHTML = `
       <label class="m-label" style="font-weight:700;font-size:14px;margin-bottom:10px">เมนูที่ ${i+1}</label>
+      <label class="m-label">ชื่อเมนู</label>
+      <input class="m-input mb-8" type="text" placeholder="เช่น ชาไทย" value="${row.name||''}" data-i="${i}" data-field="name" />
       <label class="m-label">ราคาที่ต้องการขาย / แก้ว (บาท)</label>
       <input class="m-input mb-8" type="number" min="0" placeholder="บาท" value="${row.price||''}" data-i="${i}" data-field="price" />
-      <label class="m-label">จำนวนที่ขายได้ / เดือน (แก้ว)</label>
+      <label class="m-label">สัดส่วนยอดขาย (แก้ว/เดือน)</label>
       <input class="m-input" type="number" min="0" placeholder="แก้ว" value="${row.qty||''}" data-i="${i}" data-field="qty" />
     `;
     container.appendChild(div);
   });
   container.querySelectorAll('input').forEach(el => {
     el.addEventListener('input', e => {
-      state.menuPrices[parseInt(e.target.dataset.i)][e.target.dataset.field] = parseFloat(e.target.value) || '';
+      const field = e.target.dataset.field;
+      const raw = e.target.value;
+      state.menuPrices[parseInt(e.target.dataset.i)][field] = field === 'name' ? raw : (parseFloat(raw) || '');
     });
   });
 }
@@ -1411,50 +1412,41 @@ window.saveDemandAndGo = async function() {
 };
 
 /* ════════════════════════════════
-   REFRESH VC PCT
+   WEIGHTED AVERAGE PRICE (per เมนู)
+   ราคาขายเฉลี่ยถ่วงน้ำหนัก คำนวณจาก [ราคา × สัดส่วนยอดขาย] รวมกัน หารด้วยจำนวนแก้วรวมทั้งหมด
 ════════════════════════════════ */
-function refreshVcPct() {
+function getMenuStats() {
   const rows = state.menuPrices.filter(r => r.price && r.qty);
-  let p = 0;
+  let avgPrice = 0;
   if (rows.length > 0) {
     const totalQty = rows.reduce((s,r) => s + parseFloat(r.qty||0), 0);
-    p = totalQty > 0
-      ? rows.reduce((s,r) => s + parseFloat(r.price||0)*parseFloat(r.qty||0), 0) / totalQty
+    avgPrice = totalQty > 0
+      ? rows.reduce((s,r) => s + parseFloat(r.price||0) * parseFloat(r.qty||0), 0) / totalQty
       : parseFloat(rows[0].price||0);
   }
-  const vc = numId('inp-vc');
-  const pctEl = document.getElementById('inp-vc-pct');
-  if (p > 0 && vc > 0) pctEl.value = ((vc/p)*100).toFixed(1);
-  else pctEl.value = '';
+  return { avgPrice };
+}
+
+/* ต้นทุน/แก้ว (บาท) คำนวณจาก ราคาขายเฉลี่ยถ่วงน้ำหนัก × %ต้นทุนผันแปร (กรอกเอง) ÷ 100 */
+function getWeightedVc() {
+  const { avgPrice } = getMenuStats();
+  const pct = numId('inp-vc-pct');
+  return (avgPrice > 0 && pct > 0) ? (avgPrice * pct / 100) : 0;
 }
 
 /* ════════════════════════════════
    CORE MATH
 ════════════════════════════════ */
 function computeAll() {
-  const rows = state.menuPrices.filter(r => r.price && r.qty);
-  let p = 0;
-  if (rows.length > 0) {
-    const totalQty = rows.reduce((s,r) => s + parseFloat(r.qty||0), 0);
-    p = totalQty > 0
-      ? rows.reduce((s,r) => s + parseFloat(r.price||0)*parseFloat(r.qty||0), 0) / totalQty
-      : parseFloat(rows[0].price||0);
-  }
-
-  const vc = numId('inp-vc');
+  const { avgPrice: p } = getMenuStats(); // ราคาขายเฉลี่ยถ่วงน้ำหนัก (Weighted Average Price)
+  const vcPct = numId('inp-vc-pct'); // % ต้นทุนผันแปร กรอกเอง (ไม่คำนวณอัตโนมัติ)
+  const vc = getWeightedVc(); // ต้นทุน/แก้ว (บาท) = ราคาขายเฉลี่ย × % ÷ 100
   const b  = totalFixedCost();
   const Q  = numId('inp-cap');
 
-  // VC %
-  if (p > 0 && vc > 0) {
-    const pctEl = document.getElementById('inp-vc-pct');
-    if (pctEl) pctEl.value = ((vc/p)*100).toFixed(1);
-    const dashVcPct = document.getElementById('dash-vcpct');
-    if (dashVcPct) dashVcPct.textContent = ((vc/p)*100).toFixed(1) + '%';
-  } else {
-    const dashVcPct = document.getElementById('dash-vcpct');
-    if (dashVcPct) dashVcPct.textContent = '–';
-  }
+  // VC % (แสดงผลบน Dashboard ตามค่าที่ผู้ใช้กรอกเอง ไม่คำนวณย้อนกลับ)
+  const dashVcPct = document.getElementById('dash-vcpct');
+  if (dashVcPct) dashVcPct.textContent = vcPct > 0 ? vcPct.toFixed(1) + '%' : '–';
 
   // BEP
   const bep = (p - vc) > 0 ? Math.ceil(b / (p - vc)) : null;
@@ -1547,6 +1539,7 @@ function renderEqChart() {
 
   const demandPts = [];
   let eqX = null, eqY = null;
+  let eqInvalid = false; // true when the computed equilibrium point is negative (ข้อมูลไม่สอดคล้องกัน)
 
   if (demandReg) {
     for (let i = 0; i <= steps; i++) {
@@ -1562,8 +1555,17 @@ function renderEqChart() {
     const A = S0*r - demandReg.slope;
     const B = demandReg.intercept + S0*r*x0 - S0;
     if (Math.abs(A) > 1e-10) {
-      eqX = -B / A;
-      eqY = supplyPrice(eqX);
+      const rawEqX = -B / A;
+      const rawEqY = supplyPrice(rawEqX);
+      // ห้ามแสดงจุดดุลยภาพที่ติดลบ (ปริมาณหรือราคาน้อยกว่า 0) — ถือว่าข้อมูลไม่สอดคล้องกัน
+      if (rawEqX < 0 || rawEqY < 0) {
+        eqInvalid = true;
+        eqX = null;
+        eqY = null;
+      } else {
+        eqX = rawEqX;
+        eqY = rawEqY;
+      }
     }
   }
 
@@ -1646,9 +1648,20 @@ function renderEqChart() {
     }
   });
 
-  // Update equilibrium KPI
-  document.getElementById('eq-price').textContent = eqY !== null ? fmt(eqY) + ' ฿' : '–';
-  document.getElementById('eq-qty').textContent   = eqX !== null ? fmt(eqX) + ' แก้ว' : '–';
+  // Update equilibrium KPI — ห้ามแสดงค่าติดลบ ให้แสดง "ข้อมูลไม่สอดคล้องกัน" แทน
+  const eqPriceEl = document.getElementById('eq-price');
+  const eqQtyEl   = document.getElementById('eq-qty');
+  if (eqInvalid) {
+    eqPriceEl.textContent = '-';
+    eqQtyEl.textContent   = '-';
+    eqPriceEl.title = 'ข้อมูลไม่สอดคล้องกัน';
+    eqQtyEl.title   = 'ข้อมูลไม่สอดคล้องกัน';
+  } else {
+    eqPriceEl.textContent = eqY !== null ? fmt(eqY) + ' ฿' : '–';
+    eqQtyEl.textContent   = eqX !== null ? fmt(eqX) + ' แก้ว' : '–';
+    eqPriceEl.removeAttribute('title');
+    eqQtyEl.removeAttribute('title');
+  }
 }
 
 /* ════════════════════════════════
